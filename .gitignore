@@ -1,11 +1,29 @@
+# Python artifacts
 __pycache__/
 *.py[cod]
-
-
-
-
-
 *.log
+*.bak
 
+# Audio/text outputs
+*.wav
+*.mp4
+*.csv
+*.arff
+*.zip
+*.tar.gz
 
+# Dataset folders
+datasets/
+pipe_data/
 
+# Virtual environments
+env/
+venv/
+*.env
+
+# IDE configs
+.vscode/
+.idea/
+
+# openSMILE binaries
+opensmile-3.0.2-windows-x86_64/
