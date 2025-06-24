@@ -2,29 +2,26 @@ import subprocess
 import sys
 import os
 
-# === Set Your Working Directory Paths ===
-PIPE_DATA_DIR = "C:\\Users\\Administrator\\Desktop\\mohit_project"
-
-# === Scripts to Run ===
 SCRIPTS = [
-    "prepare_meld.py",
-    "convert_mp4_wav.py",
-    "extract_audio_features.py"
+    ("prepare_meld.py", "meld_audio_text.csv"),
+    ("convert_mp4_wav.py", "meld_with_wavs.csv"),
+    ("extract_audio_features.py", "meld_audio_prosody.csv")
 ]
 
-def run_script(script_path):
-    print(f"\n🚀 Running {script_path}...")
-    try:
-        subprocess.run([sys.executable, script_path], check=True)
-        print(f"✅ Completed: {script_path}")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Failed: {script_path}\n{e}")
+SPLITS = ["train", "dev", "test"]
+BASE = r"C:\Users\Administrator\Desktop\mohit_project\pipe_data"
+
+def run_script(script, split, expected_file):
+    output_path = os.path.join(BASE, split, expected_file)
+    if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+        print(f"⏩ Already done: {script} ({split})")
+        return
+    print(f"🚀 Running: {script} --split {split}")
+    subprocess.run([sys.executable, script, "--split", split], check=True)
 
 if __name__ == "__main__":
-    # Set working directory to pipe_data so relative paths work
-    os.chdir(PIPE_DATA_DIR)
-
-    for script in SCRIPTS:
-        run_script(script)
-
-    print("\n🏁 All pipeline steps completed.")
+    os.chdir(r"C:\Users\Administrator\Desktop\mohit_project")
+    for split in SPLITS:
+        print(f"\n🔁 Processing split: {split.upper()}")
+        for script, output in SCRIPTS:
+            run_script(script, split, output)

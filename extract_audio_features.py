@@ -1,67 +1,65 @@
 import os
 import pandas as pd
 import subprocess
+import argparse
 
-# === CONFIGURATION ===
-INPUT_CSV = r"C:\Users\Administrator\Desktop\mohit_project\pipe_data\meld_with_wavs.csv"
-SMILE_PATH = r"C:\Users\Administrator\Desktop\mohit_project\opensmile-3.0.2-windows-x86_64\opensmile-3.0.2-windows-x86_64\bin\SMILExtract.exe"
-CONFIG_PATH = r"C:\Users\Administrator\Desktop\mohit_project\opensmile-3.0.2-windows-x86_64\opensmile-3.0.2-windows-x86_64\config\gemaps\v01a\GeMAPSv01a.conf"
-OUTPUT_FOLDER = r"C:\Users\Administrator\Desktop\mohit_project\pipe_data\prosody_features"
-FINAL_OUTPUT = r"C:\Users\Administrator\Desktop\mohit_project\pipe_data\meld_audio_prosody.csv"
+parser = argparse.ArgumentParser()
+parser.add_argument('--split', required=True, choices=['train', 'dev', 'test'])
+args = parser.parse_args()
+split = args.split
 
+BASE = f"C:/Users/Administrator/Desktop/mohit_project/pipe_data/{split}"
+INPUT_CSV = os.path.join(BASE, "meld_with_wavs.csv")
+OUTPUT_FOLDER = os.path.join(BASE, "prosody_features")
+FINAL_OUTPUT = os.path.join(BASE, "meld_audio_prosody.csv")
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# === Function to parse ARFF-style CSV from openSMILE ===
+if os.path.exists(FINAL_OUTPUT):
+    print(f"⏩ Skipping {split} - Already exists: {FINAL_OUTPUT}")
+    exit()
+
+SMILE_PATH = r"C:\Users\Administrator\Desktop\mohit_project\opensmile-3.0.2-windows-x86_64\opensmile-3.0.2-windows-x86_64\bin\SMILExtract.exe"
+CONFIG_PATH = r"C:\Users\Administrator\Desktop\mohit_project\opensmile-3.0.2-windows-x86_64\opensmile-3.0.2-windows-x86_64\config\gemaps\v01a\GeMAPSv01a.conf"
+
 def read_opensmile_csv(path):
     with open(path, 'r') as f:
         lines = f.readlines()
-    attributes = [line.split()[1] for line in lines if line.startswith("@attribute")]
+    attrs = [line.split()[1] for line in lines if line.startswith("@attribute")]
     data_line = next((line for line in lines if not line.startswith("@") and line.strip()), None)
     if not data_line:
         return pd.DataFrame()
-    values = data_line.strip().split(',')
-    return pd.DataFrame([values], columns=attributes)
+    return pd.DataFrame([data_line.strip().split(',')], columns=attrs)
 
-# === Load input CSV ===
 df = pd.read_csv(INPUT_CSV)
-print(f"📥 Loaded {len(df)} rows")
-
 summary_rows = []
 
-# === Extract + Summarize ===
 for idx, row in df.iterrows():
     wav_path = row["wav_path"]
-    if not os.path.exists(wav_path) or os.path.getsize(wav_path) < 2000:
-        print(f"⚠️ Skipping invalid file: {wav_path}")
-        continue
-
     out_csv = os.path.join(OUTPUT_FOLDER, f"utt_{idx}.csv")
-    cmd = [
-        SMILE_PATH,
-        "-C", CONFIG_PATH,
-        "-I", wav_path,
-        "-O", out_csv
-    ]
 
-    try:
-        subprocess.run(cmd, check=True, capture_output=True)
-        feats = read_opensmile_csv(out_csv)
-        if feats.empty:
-            print(f"⚠️ No features for: {wav_path}")
+    if os.path.exists(out_csv) and os.path.getsize(out_csv) > 1000:
+        print(f"⏩ Skipping utt_{idx}")
+    else:
+        cmd = [SMILE_PATH, "-C", CONFIG_PATH, "-I", wav_path, "-O", out_csv]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True)
+            print(f"✅ Extracted utt_{idx}")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ openSMILE failed for {wav_path}: {e}")
             continue
 
-        feats = feats.apply(pd.to_numeric, errors='coerce')  # convert all to float
-        feats["utt_id"] = f"utt_{idx}"
-        feats["Emotion"] = row["Emotion"]
-        feats["Utterance"] = row["Utterance"]
-        summary_rows.append(feats)
+    feats = read_opensmile_csv(out_csv)
+    if feats.empty:
+        continue
 
-    except subprocess.CalledProcessError as e:
-        print(f"❌ openSMILE failed for {wav_path}: {e}")
+    feats = feats.apply(pd.to_numeric, errors='coerce')
+    feats["utt_id"] = f"utt_{idx}"
+    feats["Emotion"] = row["Emotion"]
+    feats["Utterance"] = row["Utterance"]
+    summary_rows.append(feats)
 
-# === Postprocess ===
 if not summary_rows:
-    print("⚠️ No data to summarize.")
+    print("❌ No features extracted.")
     exit()
 
 combined = pd.concat(summary_rows, ignore_index=True)
@@ -93,4 +91,4 @@ for _, row in combined.iterrows():
 
 summary_df = pd.DataFrame(summary_data)
 summary_df.to_csv(FINAL_OUTPUT, index=False)
-print(f"✅ Saved prosodic summary to:\n{FINAL_OUTPUT}")
+print(f"✅ Prosody features saved: {FINAL_OUTPUT}")
