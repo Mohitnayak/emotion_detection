@@ -5,7 +5,7 @@ import os
 SCRIPTS = [
     ("prepare_meld.py", "meld_audio_text.csv"),
     ("convert_mp4_wav.py", "meld_with_wavs.csv"),
-    ("extract_audio_features.py", "meld_audio_prosody.csv")
+    ("extract_audio_features_wav2vec.py", "meld_audio_wav2vec.csv")
 ]
 
 SPLITS = ["train", "dev", "test"]
